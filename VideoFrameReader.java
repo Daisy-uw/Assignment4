@@ -1,6 +1,7 @@
 import org.opencv.core.*;
 import org.opencv.videoio.*;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
@@ -18,6 +19,7 @@ public class VideoFrameReader {
     static String videoPath = Paths.get(".").toAbsolutePath().normalize().toString() + "\\20020924_juve_dk_02a.avi";
    public VideoFrameReader(){
        getFrames();
+       saveImages();
        readIntensity();
        System.out.println(intensityMatrix[0][0]);
        writeIntensity();
@@ -99,6 +101,21 @@ public class VideoFrameReader {
                     BufferedImage image = MatToImage.convertMatToImage(mat);
                     frames.add(image);
                 }
+            }
+        }
+    }
+    private void saveImages(){
+        File folder = new File ("Frames");
+        if(!folder.exists()){
+            folder.mkdirs();
+        }
+        for(int i = 0; i < 4000; i++){
+
+            File outputFile = new File(folder, "image" + i + ".jpg");
+            try {
+                ImageIO.write(frames.get(i), "jpg", outputFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
