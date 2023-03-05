@@ -19,6 +19,7 @@ public class VideoFrameReader {
    public VideoFrameReader(){
        getFrames();
        readIntensity();
+       System.out.println(intensityMatrix[0][0]);
        writeIntensity();
    }
    private void writeIntensity(){
@@ -129,5 +130,6 @@ public class VideoFrameReader {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
         new VideoFrameReader();
+
     }
 }
