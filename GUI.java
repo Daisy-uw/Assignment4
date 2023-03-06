@@ -40,9 +40,14 @@ public class GUI extends JFrame {
     private JPanel leftPanel;
     // private JPanel bigPhotoPanel;
     private Double[][] intensityMatrix = new Double[4000][26];
+    private double SD[] = new double[3999];
+    private HashMap<Integer, Integer> Cmap = new HashMap<>();
+    private HashMap<Integer, Integer> Fmap = new HashMap<>();
     int picNo = 0;
     int imageCount = 1; // keeps up with the number of images displayed since the first page.
     int pageNo = 1;
+    double Tb = 0;
+    double Ts = 0;
 
     public static void main(String args[]) {
 
@@ -98,8 +103,6 @@ public class GUI extends JFrame {
         colorCode.setForeground(Color.decode("#E18A8A"));
         JButton intensityAndColor = new JButton("Intensity + Color");
         intensityAndColor.setForeground(Color.decode("#66C698"));
-        JCheckBox relavantBtn = new JCheckBox("relevant");
-        relavantBtn.setForeground(Color.decode("#BB76BC"));
 
         leftPanel.setBackground(Color.decode("#FFFAF5"));
         leftPanel.setLayout(gridLayout2);
@@ -108,7 +111,6 @@ public class GUI extends JFrame {
         leftPanel.add(intensity);
         leftPanel.add(colorCode);
         leftPanel.add(intensityAndColor);
-        leftPanel.add(relavantBtn);
 
         setLocationRelativeTo(null);
         nextPage.addActionListener(new GUI.nextPageHandler());
@@ -121,7 +123,7 @@ public class GUI extends JFrame {
         button = new JButton[4000];
         for (int i = 0; i < 4000; i++) {
             ImageIcon icon;
-            icon = new ImageIcon(getClass().getResource("Frames/" + (i+ 1000)+ ".jpg"));
+            icon = new ImageIcon(getClass().getResource("Frames/image" + i+ ".jpg"));
 
             if (icon != null) {
                 button[i] = new JButton(icon);
@@ -130,16 +132,142 @@ public class GUI extends JFrame {
                 btn.add(cb);
                 cb.setVisible(false);
                 button[i].addActionListener(new GUI.IconButtonHandler(i, icon));
-                buttonOrder[i] = i+1000;
+                buttonOrder[i] = i;
+            }
+        }
+        readIntensityFile();
+        computeSD();
+        findCSet();
+        findFset();
+        displayFirstPage();
+    }
+    private void displayFirstPage() {
+        int imageButNo = 0;
+        panelBottom1.removeAll();
+        for (int i = 1; i < 21; i++) {
+            // System.out.println(button[i]);
+            imageButNo = buttonOrder[i];
+            panelBottom1.add(button[imageButNo]);
+            imageCount++;
+        }
+        panelBottom1.revalidate();
+        panelBottom1.repaint();
+
+    }
+    public void readIntensityFile() {
+        // System.out.println("Hello");
+        StringTokenizer token;
+        Scanner read;
+        Double intensityBin;
+        String line = "";
+        int lineNumber = 0;
+        try{
+            read =new Scanner(new File ("intensity.txt"));
+            while (read.hasNextLine()){
+                line = read.nextLine();
+                token = new StringTokenizer(line, " ");
+                int i = 0;
+
+                while (token.hasMoreTokens()){
+                    intensityBin = Double.parseDouble(token.nextToken());
+                    intensityMatrix[lineNumber][i] = intensityBin;
+                    i++;
+
+                }
+                lineNumber++;
+            }
+        } catch (FileNotFoundException EE) {
+            System.out.println("The file intensity.txt does not exist");
+        }
+
+    }
+    public void computeSD(){
+        for(int i = 0; i < 3999; i++){
+            double sum = 0;
+            for(int j = 1; j < 26; j++){
+                sum += Math.abs(intensityMatrix[i][j] - intensityMatrix[i+1][j]);
+            }
+            SD[i] = sum;
+        }
+    }
+    public void setThreshold(){
+        // Tb = mean(SD) + std(SD) * 11
+        // Ts = mean(SD) * 2
+
+        //Step 1: find mean(SD)
+        double sum = 0;
+        for (int i = 0; i < 3999; i++){
+            sum += SD[i];
+        }
+        double SD_mean = sum/SD.length;
+
+        //Step 2: find std(SD)
+        double std = 0;
+        for(int i = 0; i < 3999; i++){
+            std += Math.pow(SD[i] - SD_mean, 2);
+        }
+        std = Math.sqrt(std/3998);
+
+        //Step 3: Set Tb, Ts
+        Tb = SD_mean + std * 11;
+        Ts = SD_mean * 2;
+    }
+    public void findCSet(){
+        //If SD[i] > Tb then cut start at i and end at i+1
+        for(int i = 0; i < 3999; i++){
+            if(SD[i] > Tb) Cmap.put(i, i+1);
+        }
+    }
+    public void findFset(){
+        /*  Tor = 2
+        *   If Ts <= SD[i] < Tb, consider it as potential start
+        *   of a gradual transition. The end frame of the transition is
+        *   detected when its next 2 consecutive values are lower than Ts
+        *   or reaches a cut boundary
+        */
+        for(int i = 0; i < 3999; i++){
+            if(SD[i] >= Ts && SD[i] < Tb){
+                int count = 0;
+                int Fe = i;
+                int j = i+1;
+                while(j < 3999){
+                    if(SD[j] < Ts){
+                        count++;
+                        if(count == 2) break;
+                    } else{
+                        Fe = j;
+                    }
+                    j++;
+                }
+                if(i < Fe){
+                    Fmap.put(i, Fe);
+                }
+                i = j;
+            }
+        }
+        /* If SUM (Fs -> Fe) > Tb, then it is a real gradual
+        *   transition. Checking Fmap to remove
+        *   all the invalid pairs
+        */
+        Set<Integer> S = Fmap.keySet();
+        for(int Fs: S){
+            int Fe = Fmap.get(Fs);
+            double sum = 0;
+            for(int i = Fs; i <= Fe; i++){
+                sum += SD[i];
+            }
+            if(sum < Tb){
+                Fmap.remove(Fs, Fe);
             }
         }
     }
+
     private class nextPageHandler implements ActionListener {
 
         public void actionPerformed(ActionEvent e) {
             int imageButNo = 0;
             int endImage = imageCount + 20;
-            if (endImage <= 101) {
+            if (endImage <= 4000) {
                 panelBottom1.removeAll();
                 for (int i = imageCount; i < endImage; i++) {
                     imageButNo = buttonOrder[i];
