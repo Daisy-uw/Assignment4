@@ -1,30 +1,23 @@
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.videoio.VideoCapture;
+
 import java.awt.BorderLayout;
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.awt.*;
 import java.util.*;
 import java.io.*;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.function.DoubleToIntFunction;
 
-import javax.swing.AbstractAction;
+import javax.imageio.ImageIO;
 
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
-import javax.swing.SwingWorker;
-import javax.swing.border.Border;
 import javax.swing.*;
 
 public class GUI extends JFrame {
@@ -39,10 +32,12 @@ public class GUI extends JFrame {
     private JPanel rightPanel;
     private JPanel leftPanel;
     // private JPanel bigPhotoPanel;
-    private Double[][] intensityMatrix = new Double[4000][26];
+    private Double[][] intensityMatrix = new Double[4000][25];
     private double SD[] = new double[3999];
     private HashMap<Integer, Integer> Cmap = new HashMap<>();
     private HashMap<Integer, Integer> Fmap = new HashMap<>();
+    ArrayList<Integer> shots = new ArrayList<>();
+    ArrayList<BufferedImage> first_frames = new ArrayList<>();
     int picNo = 0;
     int imageCount = 1; // keeps up with the number of images displayed since the first page.
     int pageNo = 1;
@@ -137,8 +132,12 @@ public class GUI extends JFrame {
         }
         readIntensityFile();
         computeSD();
+        setThreshold();
         findCSet();
         findFset();
+        getShot();
+        getFirstFrames();
+        saveImages();
         displayFirstPage();
     }
     private void displayFirstPage() {
@@ -182,13 +181,17 @@ public class GUI extends JFrame {
 
     }
     public void computeSD(){
+        System.out.println("Compute SD -----------------");
         for(int i = 0; i < 3999; i++){
-            double sum = 0;
-            for(int j = 1; j < 26; j++){
-                sum += Math.abs(intensityMatrix[i][j] - intensityMatrix[i+1][j]);
-            }
-            SD[i] = sum;
+            SD[i] = dist(i);
         }
+    }
+    private int dist(int i){
+        int sum = 0;
+        for(int j = 0; j < 25; j++){
+            sum += Math.abs(intensityMatrix[i+1][j] - intensityMatrix[i][j]);
+        }
+        return sum;
     }
     public void setThreshold(){
         // Tb = mean(SD) + std(SD) * 11
@@ -200,6 +203,8 @@ public class GUI extends JFrame {
             sum += SD[i];
         }
         double SD_mean = sum/SD.length;
+        System.out.println();
+        System.out.println("SD mean = " + SD_mean );
 
         //Step 2: find std(SD)
         double std = 0;
@@ -207,18 +212,27 @@ public class GUI extends JFrame {
             std += Math.pow(SD[i] - SD_mean, 2);
         }
         std = Math.sqrt(std/3998);
+        System.out.println("std = " + std);
 
         //Step 3: Set Tb, Ts
         Tb = SD_mean + std * 11;
         Ts = SD_mean * 2;
+        System.out.println("Tb = " + Tb);
+        System.out.println("Ts = "+ Ts);
     }
     public void findCSet(){
+        System.out.println("Find C Set---------------");
         //If SD[i] > Tb then cut start at i and end at i+1
         for(int i = 0; i < 3999; i++){
-            if(SD[i] > Tb) Cmap.put(i, i+1);
+            if(SD[i] > Tb) {
+                Cmap.put(i+1000, i+1+1000); //frame start from 1000
+                System.out.print((i+1000)+ " ");
+            }
         }
     }
+
     public void findFset(){
+        System.out.println("\nFind F Set --------------");
         /*  Tor = 2
         *   If Ts <= SD[i] < Tb, consider it as potential start
         *   of a gradual transition. The end frame of the transition is
@@ -240,24 +254,83 @@ public class GUI extends JFrame {
                     j++;
                 }
                 if(i < Fe){
-                    Fmap.put(i, Fe);
+                    //Check if (i, Fe) is a valid gradual transition
+                    if(isValidGT(i, Fe)){
+                        Fmap.put(i + 1000, Fe + 1000);
+                    }
                 }
                 i = j;
             }
         }
-        /* If SUM (Fs -> Fe) > Tb, then it is a real gradual
-        *   transition. Checking Fmap to remove
-        *   all the invalid pairs
-        */
-        Set<Integer> S = Fmap.keySet();
-        for(int Fs: S){
-            int Fe = Fmap.get(Fs);
-            double sum = 0;
-            for(int i = Fs; i <= Fe; i++){
-                sum += SD[i];
+    }
+
+    // This method is to check if an interval is
+    // a real gradual transition
+    private boolean isValidGT(int Fs, int Fe){
+        double sum = 0;
+        for(int i = Fs; i <= Fe; i++){
+            sum += SD[i];
+        }
+        if(sum < Tb) return false;
+        System.out.println("Fs = "+ Fs + " Fe = " + Fe );
+        return true;
+    }
+    public void getShot(){
+        //Store the index of first frame in each shot to ArrayList Shot
+        //Show first frame of each shot: ( Ce ,Fs + 1) - the first frame of each shot
+        //(Cs ,Fs) - the end frame of its previous shot)
+        shots.add(1000); // adding the first frame
+        for(int frame: Cmap.keySet()){
+            shots.add(frame + 1);
+        }
+        for(int frame: Fmap.keySet()){
+            shots.add(frame + 1);
+        }
+        Collections.sort(shots);
+        System.out.println("Number of start frames = " + shots.size());
+
+    }
+    private void getFirstFrames(){
+        String videoPath = VideoFrameReader.videoPath;
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+
+        // Create a VideoCapture object to read from the video file
+        VideoCapture videoCapture = new VideoCapture(videoPath);
+
+        // Check if the VideoCapture object was successfully opened
+        if (!videoCapture.isOpened()) {
+            System.out.println("Error opening video file");
+            return;
+        }else{
+            Mat mat = new Mat();
+
+            //get frames that have index stored in `shots` from the video
+            int count = 0;
+            int i = 0;
+            while (videoCapture.read(mat) && i < shots.size()) {
+                count++;
+                if(count == shots.get(i)){
+                    BufferedImage image = VideoFrameReader.MatToImage.convertMatToImage(mat);
+                    first_frames.add(image);
+                    i++;
+                }
             }
-            if(sum < Tb){
-                Fmap.remove(Fs, Fe);
+        }
+        System.out.println("Check if collect enough image" +
+                            (shots.size() == first_frames.size()));
+    }
+    private void saveImages(){
+        File folder = new File ("Frames");
+        if(!folder.exists()){
+            folder.mkdirs();
+        }
+        for(int i = 0; i < shots.size(); i++){
+
+            File outputFile = new File(folder, "image" + shots.get(i) + ".jpg");
+            try {
+                ImageIO.write(first_frames.get(i), "jpg", outputFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }

@@ -13,15 +13,14 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class VideoFrameReader {
-    double histogram[] = new double[26];
-    double intensityMatrix[][] = new double[4000][26];
+    double histogram[] = new double[25];
+    double intensityMatrix[][] = new double[4000][25];
     private ArrayList<BufferedImage> frames = new ArrayList<>();
     static String videoPath = Paths.get(".").toAbsolutePath().normalize().toString() + "\\20020924_juve_dk_02a.avi";
    public VideoFrameReader(){
        getFrames();
-       saveImages();
+       //saveImages();
        readIntensity();
-       System.out.println(intensityMatrix[0][0]);
        writeIntensity();
    }
    private void writeIntensity(){
@@ -32,7 +31,7 @@ public class VideoFrameReader {
            BufferedWriter line = new BufferedWriter(file);
 
            for (int i = 0; i < 4000; i++) {
-               for (int j = 0; j < 26; j++) {
+               for (int j = 0; j < 25; j++) {
                    line.write(String.valueOf(intensityMatrix[i][j]) + " ");
                }
                line.newLine();
@@ -48,16 +47,16 @@ public class VideoFrameReader {
     private void readIntensity(){
         for(int i = 0; i < frames.size(); i++){
             BufferedImage image = frames.get(i);
-            int height = image.getHeight();
-            int width = image.getWidth();
-            countBin(image, height, width);
-            for(int bin = 0; bin < 26; bin++){
+            countBin(image);
+            for(int bin = 0; bin < 25; bin++){
                 intensityMatrix[i][bin] = histogram[bin];
+                histogram[bin] = 0;
             }
         }
     }
-    private void countBin(BufferedImage image, int height, int width) {
-        histogram[0] = height * width;
+    private void countBin(BufferedImage image) {
+        int height = image.getHeight();
+        int width = image.getWidth();
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
                 Color color = new Color(image.getRGB(i, j));
@@ -67,10 +66,10 @@ public class VideoFrameReader {
 
                 // calculate the intensity and the bin number
                 // store it into the intensityBins matrix
-                double intensity = 0.2999 * red + 0.587 * green + 0.114 * blue;
-                int bin = (int) intensity / 10 + 1;
-                if (bin > 25) {
-                    bin = 25;
+                double intensity = 0.299 * red + 0.587 * green + 0.114 * blue;
+                int bin = (int) intensity / 10;
+                if (bin > 24) {
+                    bin = 24;
                 }
                 histogram[bin]++;
             }
@@ -104,7 +103,7 @@ public class VideoFrameReader {
             }
         }
     }
-    private void saveImages(){
+    /*private void saveImages(){
         File folder = new File ("Frames");
         if(!folder.exists()){
             folder.mkdirs();
@@ -118,12 +117,12 @@ public class VideoFrameReader {
                 throw new RuntimeException(e);
             }
         }
-    }
+    }*/
 
     /*  This class is to convert a Mat object into
     *   an BufferredImage object
     */
-    private static class MatToImage {
+     static class MatToImage {
         static {
             System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
         }
