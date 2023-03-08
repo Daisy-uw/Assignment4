@@ -268,10 +268,10 @@ public class GUI extends JFrame {
         for(int i = 0; i < SD.length; i++){
             if(SD[i] >= Tb) {
                 Cmap.put(i+1000, i+1+1000); //frame start from 1000
-                System.out.println(i+1+1000);
+                System.out.println("Cs = " + (i+1000) + " Ce = " + (i+1+1000));
             }
         }
-        System.out.println(SD[617] >= Tb);
+
     }
 
     public void findFset(){
@@ -281,6 +281,7 @@ public class GUI extends JFrame {
         *   detected when its next 2 consecutive values are lower than Ts
         *   or reaches a cut boundary
         */
+        Map<Integer, Integer> temp = new HashMap<>();
         for(int i = 0; i < SD.length; i++){
             if(SD[i] >= Ts && SD[i] < Tb){
 
@@ -296,14 +297,17 @@ public class GUI extends JFrame {
                     }
                     j++;
                 }
-                if(i < Fe){
-                    //Check if (i, Fe) is a valid gradual transition
-                    if(isValidGT(i, Fe)){
-                        Fmap.put(i + 1000, Fe + 1000);
-                        System.out.println(i+1000+1);
-                    }
-                }
+                temp.put(i, Fe);
                 i = j;
+            }
+        }
+
+        // For each Fs_candi and Fe_candi, check if it is a valid pair
+        // then put on the Fmap.
+        for(int Fs: temp.keySet()){
+            int Fe = temp.get(Fs);
+            if(isValidGT(Fs, Fe)){
+                Fmap.put(Fs + 1000, Fe + 1000);
             }
         }
     }
