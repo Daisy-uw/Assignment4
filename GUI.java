@@ -35,8 +35,8 @@ public class GUI extends JFrame {
     private JPanel rightPanel;
     private JPanel leftPanel;
     // private JPanel bigPhotoPanel;
-    private Double[][] intensityMatrix = new Double[4000][25];
-    private double SD[] = new double[3999];
+    private int[][] intensityMatrix = new int[4000][25];
+    private int SD[] = new int[3999];
     private HashMap<Integer, Integer> Cmap = new HashMap<>();
     private HashMap<Integer, Integer> Fmap = new HashMap<>();
     ArrayList<Integer> shots = new ArrayList<>();
@@ -206,7 +206,7 @@ public class GUI extends JFrame {
     public void readIntensityFile() {
         StringTokenizer token;
         Scanner read;
-        Double intensityBin;
+        int intensityBin;
         String line = "";
         int lineNumber = 0;
         try{
@@ -217,7 +217,7 @@ public class GUI extends JFrame {
                 int i = 0;
 
                 while (token.hasMoreTokens()){
-                    intensityBin = Double.parseDouble(token.nextToken());
+                    intensityBin = Integer.parseInt(token.nextToken());
                     intensityMatrix[lineNumber][i] = intensityBin;
                     i++;
 
@@ -230,7 +230,7 @@ public class GUI extends JFrame {
 
     }
     public void computeSD(){
-        for(int i = 0; i < 3999; i++){
+        for(int i = 0; i < SD.length; i++){
             SD[i] = dist(i);
         }
     }
@@ -247,30 +247,31 @@ public class GUI extends JFrame {
 
         //Step 1: find mean(SD)
         double sum = 0;
-        for (int i = 0; i < 3999; i++){
+        for (int i = 0; i < SD.length; i++){
             sum += SD[i];
         }
         double SD_mean = sum/SD.length;
 
         //Step 2: find std(SD)
         double std = 0;
-        for(int i = 0; i < 3999; i++){
-            std += Math.pow(SD[i] - SD_mean, 2);
+        for(int i = 0; i < SD.length; i++){
+            std += Math.pow((double)SD[i] - SD_mean, 2);
         }
-        std = Math.sqrt(std/3999);
+        std = Math.sqrt(std/(double)SD.length);
 
         //Step 3: Set Tb, Ts
         Tb = SD_mean + std * 11;
         Ts = SD_mean * 2;
     }
     public void findCSet(){
-        //If SD[i] > Tb then cut start at i and end at i+1
-        for(int i = 0; i < 3999; i++){
-            if(SD[i] > Tb) {
+        //If SD[i] >= Tb then cut start at i and end at i+1
+        for(int i = 0; i < SD.length; i++){
+            if(SD[i] >= Tb) {
                 Cmap.put(i+1000, i+1+1000); //frame start from 1000
                 System.out.println(i+1+1000);
             }
         }
+        System.out.println(SD[617] >= Tb);
     }
 
     public void findFset(){
@@ -280,15 +281,16 @@ public class GUI extends JFrame {
         *   detected when its next 2 consecutive values are lower than Ts
         *   or reaches a cut boundary
         */
-        for(int i = 0; i < 3999; i++){
+        for(int i = 0; i < SD.length; i++){
             if(SD[i] >= Ts && SD[i] < Tb){
-                int count = 0;
+
                 int Fe = i;
                 int j = i+1;
-                while(j < 3999){
-                    if(SD[j] < Ts){
-                        count++;
-                        if(count == 2) break;
+                while(j < SD.length){
+                    if(SD[j] >= Tb) break;
+                    else if(SD[j] < Ts){
+                        if(j+ 1 >= SD.length || SD[j+1] < Ts )
+                            break;
                     } else{
                         Fe = j;
                     }

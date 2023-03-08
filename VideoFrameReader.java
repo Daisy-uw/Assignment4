@@ -13,8 +13,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class VideoFrameReader {
-    double histogram[] = new double[25];
-    double intensityMatrix[][] = new double[4000][25];
+    int histogram[] = new int[25];
+    int intensityMatrix[][] = new int[4000][25];
     private ArrayList<BufferedImage> frames = new ArrayList<>();
     static String videoPath = Paths.get(".").toAbsolutePath().normalize().toString() + "\\20020924_juve_dk_02a.avi";
    public VideoFrameReader(){
@@ -103,21 +103,6 @@ public class VideoFrameReader {
             }
         }
     }
-    /*private void saveImages(){
-        File folder = new File ("Frames");
-        if(!folder.exists()){
-            folder.mkdirs();
-        }
-        for(int i = 0; i < 4000; i++){
-
-            File outputFile = new File(folder, "image" + i + ".jpg");
-            try {
-                ImageIO.write(frames.get(i), "jpg", outputFile);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }*/
 
     /*  This class is to convert a Mat object into
     *   an BufferredImage object
