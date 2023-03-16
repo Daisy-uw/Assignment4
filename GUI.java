@@ -1,9 +1,13 @@
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.core.Size;
 import org.opencv.highgui.HighGui;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
+import org.opencv.videoio.Videoio;
 
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
@@ -148,47 +152,84 @@ public class GUI extends JFrame {
     }
     private class PlayShotHandler implements ActionListener{
         public void actionPerformed(ActionEvent e) {
-            int ff = shots.get(picNo); //first frame of the shot is the selected image
-            int lf = Fmap.get(ff); // last frame of the shot
-            System.out.println("First frame = " + ff);
-            System.out.println("Last frame = " + lf);
+            int start_frame = shots.get(picNo); //first frame of the shot is the selected image
+            int end_frame = Fmap.get(start_frame); // last frame of the shot
+            System.out.println("Start frame = " + start_frame);
+            System.out.println("End frame = " + end_frame);
 
-            //play the shot
-            // Load the video file
+            // Load the video file and check if it is opened
             VideoCapture capture = new VideoCapture(VideoFrameReader.videoPath);
             if (!capture.isOpened()) {
                 System.err.println("Could not open video file.");
                 System.exit(1);
             }
-            // Loop through the frames and write each frame to the output video file
-            Mat mat = new Mat();
 
-            //HighGui.namedWindow("Video Player", HighGui.WINDOW_AUTOSIZE);
-            int count = 0;
-            while(count < ff){
-                capture.read(mat);
-                count++;
-            }
-            String shot_name = "Shot " + (picNo + 1);
-            ArrayList<Mat> list = new ArrayList<>();
-            while (count <= lf) {
-                Mat shot = new Mat();
-                capture.read(shot);
-                list.add(shot);
-                count++;
+            //Set position of the video to start frame
+            capture.set(Videoio.CAP_PROP_POS_FRAMES, start_frame);
 
-            }
-            for(Mat m: list){
-                HighGui.imshow(shot_name, m);
-                if (HighGui.waitKey(25) == 27) {
-                    System.err.println("Could not play the shot.");
-                    System.exit(1);
-                }
-            }
+            /*//Create a new window to show the shot
+            HighGui.namedWindow("Video", HighGui.WINDOW_NORMAL);
 
            // Release the resources
+            Mat mat = new Mat();
+            for(int i = start_frame; i <=end_frame; i++){
+                capture.read(mat);
+                if(mat.empty()) break;
+                HighGui.imshow("Video", mat);
+                HighGui.waitKey(10);
+            }
             capture.release();
-            HighGui.destroyAllWindows();
+            HighGui.destroyAllWindows();*/
+
+            // Create a JFrame to display the video
+            JFrame frame = new JFrame("Video Player");
+
+            // Create a JLabel to hold the video frames
+            JLabel label = new JLabel();
+            frame.add(label);
+
+            // Set the size of the JFrame
+            frame.setSize(640, 480);
+
+            // Show the JFrame
+            frame.setVisible(true);
+
+            // Loop through the video frames
+            for (int i = start_frame; i <= end_frame; i++) {
+
+                // Read the next frame from the video
+                Mat frameMat = new Mat();
+                capture.read(frameMat);
+
+                // Resize the frame to fit the JLabel
+                Mat resizedMat = new Mat();
+                Size size = new Size(label.getWidth(), label.getHeight());
+                Imgproc.resize(frameMat, resizedMat, size);
+
+                MatOfByte matOfByte = new MatOfByte();
+                Imgcodecs.imencode(".jpg", resizedMat, matOfByte);
+                byte[] data = matOfByte.toArray();
+
+                // Create a BufferedImage from the byte array
+                BufferedImage image = null;
+                try {
+                    image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(data));
+                } catch (java.io.IOException image_reading_err) {
+                    image_reading_err.printStackTrace();
+                }
+
+                // Set the JLabel's icon to the converted BufferedImage
+                ImageIcon icon = new ImageIcon(image);
+                label.setIcon(icon);
+
+                // Wait for a specified amount of time between each frame
+                try {
+                    Thread.sleep(40); // 25 frames per second
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+
+            }
         }
     }
     private void displayFirstPage() {
@@ -242,33 +283,38 @@ public class GUI extends JFrame {
         return sum;
     }
     public void setThreshold(){
-        // Tb = mean(SD) + std(SD) * 11
+         // Tb = mean(SD) + std(SD) * 11
         // Ts = mean(SD) * 2
 
         //Step 1: find mean(SD)
-        double sum = 0;
+        int sum = 0;
         for (int i = 0; i < SD.length; i++){
             sum += SD[i];
         }
-        double SD_mean = sum/SD.length;
+        int SD_mean = sum/SD.length;
+        System.out.println("SD mean = " + SD_mean);
 
         //Step 2: find std(SD)
         double std = 0;
         for(int i = 0; i < SD.length; i++){
-            std += Math.pow((double)SD[i] - SD_mean, 2);
+            std += Math.pow(SD[i] - SD_mean, 2);
         }
-        std = Math.sqrt(std/(double)SD.length);
+        std = Math.sqrt(std/(SD.length));
+        System.out.println("std = " + std);
 
         //Step 3: Set Tb, Ts
         Tb = SD_mean + std * 11;
         Ts = SD_mean * 2;
+        System.out.println("Tb = " + Tb);
+        System.out.println("Ts = " + Ts);
     }
     public void findCSet(){
         //If SD[i] >= Tb then cut start at i and end at i+1
+        System.out.println("--------Ce values---------");
         for(int i = 0; i < SD.length; i++){
             if(SD[i] >= Tb) {
                 Cmap.put(i+1000, i+1+1000); //frame start from 1000
-                System.out.println("Cs = " + (i+1000) + " Ce = " + (i+1+1000));
+                System.out.println((i+1+1000));
             }
         }
 
@@ -304,10 +350,12 @@ public class GUI extends JFrame {
 
         // For each Fs_candi and Fe_candi, check if it is a valid pair
         // then put on the Fmap.
+        System.out.println("---------Fs + 1 values-------");
         for(int Fs: temp.keySet()){
             int Fe = temp.get(Fs);
             if(isValidGT(Fs, Fe)){
                 Fmap.put(Fs + 1000, Fe + 1000);
+                System.out.println((Fs + 1000 + 1));
             }
         }
     }
@@ -319,6 +367,7 @@ public class GUI extends JFrame {
         for(int i = Fs; i <= Fe; i++){
             sum += SD[i];
         }
+
         if(sum < Tb) return false;
         return true;
     }
@@ -373,6 +422,7 @@ public class GUI extends JFrame {
                 }
             }
         }
+        System.out.println(shots.size() == frames.size());
 
     }
     private void saveImages(){

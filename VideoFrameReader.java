@@ -1,20 +1,21 @@
 import org.opencv.core.*;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.*;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class VideoFrameReader {
     int histogram[] = new int[25];
     int intensityMatrix[][] = new int[4000][25];
+    int first_frame = 1000;
+    int last_frame = 4999;
     private ArrayList<BufferedImage> frames = new ArrayList<>();
     static String videoPath = Paths.get(".").toAbsolutePath().normalize().toString() + "\\20020924_juve_dk_02a.avi";
    public VideoFrameReader(){
@@ -30,7 +31,7 @@ public class VideoFrameReader {
            FileWriter file = new FileWriter(file_name);
            BufferedWriter line = new BufferedWriter(file);
 
-           for (int i = 0; i < 4000; i++) {
+           for (int i = 0; i < intensityMatrix.length; i++) {
                for (int j = 0; j < 25; j++) {
                    line.write(String.valueOf(intensityMatrix[i][j]) + " ");
                }
@@ -67,7 +68,7 @@ public class VideoFrameReader {
                 // calculate the intensity and the bin number
                 // store it into the intensityBins matrix
                 double intensity = 0.299 * red + 0.587 * green + 0.114 * blue;
-                int bin = (int) intensity / 10;
+                int bin = (int) (intensity / 10);
                 if (bin > 24) {
                     bin = 24;
                 }
@@ -91,8 +92,14 @@ public class VideoFrameReader {
             return;
         }else{
             Mat mat = new Mat();
-
+            //videoCapture.set(1, first_frame);
             //get frames 1000 to 4999 from the video
+            //int count = 0;
+            /*for(int i = first_frame; i <= last_frame; i++) {
+                videoCapture.read(mat);
+                if(mat.empty()) break;
+                frames.add(MatToImage.convertMatToImage(mat));
+            }*/
             int count = 0;
             while (videoCapture.read(mat)) {
                 count++;
